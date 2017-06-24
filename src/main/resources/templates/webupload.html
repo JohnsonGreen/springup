@@ -14,6 +14,12 @@
         <div id="filePicker">选择</div>
     </div>
 
+    <div id="item1">
+        <p class="state">
+
+        </p>
+    </div>
+
 </div>
 
 
@@ -23,6 +29,81 @@
 <script>
     var BASE_URL = "http://localhost:8011";
     var MD5ofFile="";
+
+
+
+
+    var fileMd5;
+    //监听分块上传过程中的三个时间点
+    WebUploader.Uploader.register({
+        "before-send-file":"beforeSendFile",    //上传单个文件前触发，用于向服务器发送请求验证MD5;即文件是否存在
+        "before-send":"beforeSend",              //上传分块前触发，用于向服务器发送请求验证分块在服务器中是否存在
+        "after-send-file":"afterSendFile",
+    },{
+        //时间点1：所有分块进行上传之前调用此函数
+        beforeSendFile:function(file){
+            var deferred = WebUploader.Deferred();
+            //1、计算文件的唯一标记，用于断点续传
+            (new WebUploader.Uploader()).md5File(file,0,10*1024*1024)
+                .progress(function(percentage){
+                    $('#item1').find("p.state").text("正在读取文件信息...");
+                })
+                .then(function(val){
+                    fileMd5=val;
+                    $('#item1').find("p.state").text("成功获取文件信息...");
+                    //获取文件信息后进入下一步
+                    deferred.resolve();
+                });
+            return deferred.promise();
+        },
+
+        beforeSend:function(block){                         //如果有分块上传，则每个分块上传之前调用此函数
+            var deferred = WebUploader.Deferred();          //规定返回一个deffer对象，实现异步调用
+            $.ajax({
+                type:"POST",
+                url:"<%=basePath%>Video?action=checkChunk",
+                data:{
+                    //文件唯一标记
+                    fileMd5:fileMd5,
+                    //当前分块下标
+                    chunk:block.chunk,
+                    //当前分块大小
+                    chunkSize:block.end-block.start
+                },
+                dataType:"json",
+                success:function(response){
+                    if(response.ifExist){
+                        //分块存在，跳过
+                        deferred.reject();
+                    }else{
+                        //分块不存在或不完整，重新发送该分块内容
+                        deferred.resolve();
+                    }
+                }
+            });
+
+            this.owner.options.formData.fileMd5 = fileMd5;
+            deferred.resolve();
+            return deferred.promise();
+        },
+        //时间点3：所有分块上传成功后调用此函数
+        afterSendFile:function(){
+            //如果分块上传成功，则通知后台合并分块
+            $.ajax({
+                type:"POST",
+                url:"<%=basePath%>Video?action=mergeChunks",
+                data:{
+                    fileMd5:fileMd5,
+                },
+                success:function(response){
+                    alert("上传成功");
+                    var path = "uploads/"+fileMd5+".mp4";
+                    $("#item1").attr("src",path);
+                }
+            });
+        }
+    });
+
     var uploader = WebUploader.create({
         auto:true,            //选中直接上传
         // swf文件路径
@@ -76,8 +157,18 @@
     });
 
     uploader.on( 'uploadStart', function(file) {
-        console.log(type);
+
     });
+
+    //文件加入队列进行的操作
+    uploader.on( 'fileQueued', function(file) {
+        var deferred = WebUploader.Deferred();       //返回一个jquery中的Deffered对象，便于添加done(),fail()函数等
+
+
+
+    });
+
+
 
 
     /*

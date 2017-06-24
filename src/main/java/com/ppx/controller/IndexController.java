@@ -1,5 +1,6 @@
 package com.ppx.controller;
 
+import com.google.gson.Gson;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -12,7 +13,12 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 
 /**
  * Created by cyh on 2017/6/22.
@@ -76,10 +82,40 @@ public class IndexController {
 
     @RequestMapping("/upload")
     @ResponseBody
-    public String up(@RequestParam("fileToUpload")MultipartFile file){
+    public String up( @RequestParam("fileToUpload")MultipartFile file,
+                      @RequestParam(value="fileMd5",required=false) String fileMd5,
+                      @RequestParam(value="chunk",required=false) String chunk,        //第几个块
+                      @RequestParam(value="chunkSize",required=false)Integer chunkSize  //块的大小，用于申请内存计算块的MD5值，设计最大不能超过5M
+                   ) throws IOException, NoSuchAlgorithmException,Exception{
+
+        if(chunk != null  && chunkSize != null && chunkSize != 0){   //说明是分块上传
+            byte[] uploadBytes = file.getBytes();
+
+            /*******************************计算文件的MD5值*******************************************/
+            MessageDigest md5 = MessageDigest.getInstance("MD5");
+            byte[] digest = md5.digest(uploadBytes);
+            String hashString = new BigInteger(1, digest).toString(16).toUpperCase();
+            /*******************************计算文件的MD5值*******************************************/
+
+        }
+
+
+
+        // 文件上传后的路径
+        String filePath = "H:\\upload\\";
+        if(fileMd5 != null){                   //包含文件的MD5,说明要校验是否包含文件
+            filePath += fileMd5+"\\";
+            File dir = new File(filePath);
+            if(!dir.exists())   //创建hash目录
+                if(!dir.mkdirs())
+                    throw new Exception("目录创建不成功，请重试！");
+        }
+
         if (file.isEmpty()) {
             return "文件为空";
         }
+
+
         // 获取文件名
         String fileName = file.getOriginalFilename();
         String[] strarr = fileName.split("\\\\");
@@ -89,8 +125,7 @@ public class IndexController {
         // 获取文件的后缀名
         String suffixName = fileName.substring(fileName.lastIndexOf("."));
         System.out.println("上传的后缀名为：" + suffixName);
-        // 文件上传后的路径
-        String filePath = "H:\\";
+
         // 解决中文问题，liunx下中文路径，图片显示问题
         // fileName = UUID.randomUUID() + suffixName;
         File dest = new File(filePath + realFileName);
@@ -106,7 +141,41 @@ public class IndexController {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
         return "上传失败";
     }
+
+
+    @RequestMapping("/verify")
+    @ResponseBody
+    public  Map<String,String> verify(String fileMd5,String chunkMd5, Integer chunk, Integer chunkSize){
+
+        Map<String,String> map = new HashMap<String,String>();
+        //map.put();
+
+        return map;
+    }
+
+
+    public static boolean createDir(String destDirName) {
+        File dir = new File(destDirName);
+        if (dir.exists()) {
+            System.out.println("创建目录" + destDirName + "失败，目标目录已经存在");
+            return false;
+        }
+        if (!destDirName.endsWith(File.separator)) {
+            destDirName = destDirName + File.separator;
+        }
+        //创建目录
+        if (dir.mkdirs()) {
+            System.out.println("创建目录" + destDirName + "成功！");
+            return true;
+        } else {
+            System.out.println("创建目录" + destDirName + "失败！");
+            return false;
+        }
+    }
+
+
 
 }
