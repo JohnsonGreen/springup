@@ -1,6 +1,7 @@
 package com.ppx.controller;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -79,56 +80,61 @@ public class IndexController {
         return "/success";
     }
 
-
     @RequestMapping("/upload")
     @ResponseBody
-    public String up( @RequestParam("fileToUpload")MultipartFile file,
+    public JsonObject up( @RequestParam("fileToUpload")MultipartFile file,
                       @RequestParam(value="fileMd5",required=false) String fileMd5,
-                      @RequestParam(value="chunk",required=false) String chunk,        //第几个块
-                      @RequestParam(value="chunkSize",required=false)Integer chunkSize  //块的大小，用于申请内存计算块的MD5值，设计最大不能超过5M
-                   ) throws IOException, NoSuchAlgorithmException,Exception{
-
-        if(chunk != null  && chunkSize != null && chunkSize != 0){   //说明是分块上传
-            byte[] uploadBytes = file.getBytes();
-
-            /*******************************计算文件的MD5值*******************************************/
-            MessageDigest md5 = MessageDigest.getInstance("MD5");
-            byte[] digest = md5.digest(uploadBytes);
-            String hashString = new BigInteger(1, digest).toString(16).toUpperCase();
-            /*******************************计算文件的MD5值*******************************************/
-
-        }
-
+                      @RequestParam(value="chunk",required=false) Integer chunk,        //第几个块
+                      @RequestParam(value="chunkSize",required=false) Integer chunkSize,        //第几个块
+                      @RequestParam(value="suffix",required=false) String suffix ) throws IOException, NoSuchAlgorithmException,Exception{
 
 
         // 文件上传后的路径
         String filePath = "H:\\upload\\";
+        if(suffix != null){
+            JsonObject jo = verify( filePath, suffix, fileMd5,  chunk,  chunkSize);
+            return jo;
+        }
+
+        //获取文件的hash名
+        String hashName = fileMd5;   //为完整文件时
+        String md5Chunk = "";
+        if(fileMd5 != null && chunk != null){   //说明是分块上传
+            byte[] uploadBytes = file.getBytes();
+            /*******************************计算文件的MD5值*******************************************/
+            MessageDigest md5 = MessageDigest.getInstance("MD5");
+            byte[] digest = md5.digest(uploadBytes);
+            md5Chunk = new BigInteger(1, digest).toString(16).toUpperCase();
+            /*******************************计算文件的MD5值*******************************************/
+            hashName = md5Chunk+"._"+chunk.toString()+".tmp";   //分块时，文件名为分块的hash码
+        }
+
+        String fileName = "";  //文件名
+
         if(fileMd5 != null){                   //包含文件的MD5,说明要校验是否包含文件
+            fileName = hashName;
             filePath += fileMd5+"\\";
             File dir = new File(filePath);
             if(!dir.exists())   //创建hash目录
                 if(!dir.mkdirs())
                     throw new Exception("目录创建不成功，请重试！");
+        }else{
+            // 获取文件名
+            String[] strarr = file.getOriginalFilename().split("\\\\");
+            //String realFileName = fileName.substring(fileName.lastIndexOf("\\"));
+            fileName = strarr[strarr.length - 1];
+            System.out.println("上传的文件名为：" + fileName);
+            // 获取文件的后缀名
+            String suffixName = fileName.substring(fileName.lastIndexOf("."));
+            System.out.println("上传的后缀名为：" + suffixName);
         }
 
         if (file.isEmpty()) {
             return "文件为空";
         }
 
-
-        // 获取文件名
-        String fileName = file.getOriginalFilename();
-        String[] strarr = fileName.split("\\\\");
-        //String realFileName = fileName.substring(fileName.lastIndexOf("\\"));
-        String realFileName = strarr[strarr.length - 1];
-        System.out.println("上传的文件名为：" + fileName);
-        // 获取文件的后缀名
-        String suffixName = fileName.substring(fileName.lastIndexOf("."));
-        System.out.println("上传的后缀名为：" + suffixName);
-
-        // 解决中文问题，liunx下中文路径，图片显示问题
         // fileName = UUID.randomUUID() + suffixName;
-        File dest = new File(filePath + realFileName);
+        File dest = new File(filePath + fileName);
         // 检测是否存在目录
         if (!dest.getParentFile().exists()) {
             dest.getParentFile().mkdirs();
@@ -141,20 +147,62 @@ public class IndexController {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
         return "上传失败";
     }
 
 
-    @RequestMapping("/verify")
-    @ResponseBody
-    public  Map<String,String> verify(String fileMd5,String chunkMd5, Integer chunk, Integer chunkSize){
+    //验证文件或者分块是否存在
+    private  JsonObject  verify(String filePath,String suffix,String fileMd5, Integer chunk, Integer chunkSize){
+
+
+        JsonObject jo = new JsonObject();
 
         Map<String,String> map = new HashMap<String,String>();
-        //map.put();
+        File exfile = new File(filePath+fileMd5+"."+suffix);
+        if(exfile.exists()){    //存在上传好的大文件
+           // map.put("fileExist","true");
+            jo.addProperty("fileExist",true);
+        }else{
+          //  map.put("fileExist","false");
+            jo.addProperty("fileExist",false);
+            File exdir =  new File(filePath+fileMd5);
+            if(exdir.exists()){
+                //map.put("fileDirExist","true");
+                jo.addProperty("fileDirExist",true);
+                File[] fileArray = exdir.listFiles();
+                int i =0;
+                for(;i < fileArray.length;i++){
+                    String numstr = (fileArray[i].getName().split("."))[1];
+                    if(chunk.equals(Integer.parseInt(numstr.substring(1))) && chunkSize.equals(fileArray[i].length())){    //分块序号相等，且分块大小相等
+                        //map.put("chunkExist","true");
+                        jo.addProperty("chunkExist",true);
+                        break;
+                    }
+                    //chunkName.split(".");
+                }
+                if(i == fileArray.length)
+                   // map.put("chunkExist","false");
+                    jo.addProperty("chunkExist",false);
+            }else{
+                //map.put("fileDirExist","false");
+                jo.addProperty("fileDirExist",false);
+                //map.put("chunkExist","false");
+                jo.addProperty("chunkExist",false);
+            }
+        }
 
-        return map;
+        return jo;
     }
+
+
+
+
+
+
+
+
+
+
 
 
     public static boolean createDir(String destDirName) {
