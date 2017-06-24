@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" type="text/css" href="/webuploader/webuploader.css" />
+</head>
+<body>
+
+<div id="uploader" class="wu-example">
+    <!--用来存放文件信息-->
+
+    <div class="uploader-container">
+        <div id="filePicker">选择</div>
+    </div>
+
+</div>
+
+
+</body>
+<script type="text/javascript" src="/js/jquery.js"></script>
+<script type="text/javascript" src="/webuploader/webuploader.js"></script>
+<script>
+    var BASE_URL = "http://localhost:8011";
+    var MD5ofFile="";
+    var uploader = WebUploader.create({
+        auto:true,            //选中直接上传
+        // swf文件路径
+        swf: BASE_URL + '/swf/Uploader.swf',
+
+        // 文件接收服务端
+        server: BASE_URL+'/upload',
+        formData:{ guid:MD5ofFile },               //针对每个文件生成不同的MD5值，作为后台的文件名或文件夹名
+        fileVal:'fileToUpload',   //上传的文件name
+        // 选择文件的按钮。可选。
+        // 内部根据当前运行是创建，可能是input元素，也可能是flash.
+        pick: '#filePicker',
+        chunked:true,           //是否分片
+        chunkSize:2 * 1024 * 1024,
+        chunkRetry:2,    //允许重传
+        threads:3,
+        fileNumLimit: 300,
+        fileSizeLimit: 2000 * 1024 * 1024,    // 2000 M
+        fileSingleSizeLimit: 4*500 * 1024 * 1024,    // 2000 M
+        // 不压缩image, 默认如果是jpeg，文件上传前会压缩一把再上传！
+        resize: false
+
+    });
+
+    /*
+
+    uploader.onUploadProgress = function( file, percentage ) {
+        console.log("onUploadProgress");
+    };
+
+    uploader.onFileQueued = function( file ) {
+        console.log("onFileQueued")
+    };
+
+    uploader.onFileDequeued = function( file ) {
+       console.log("onFileDequeued");
+    };
+
+
+
+
+    /*
+    uploader.onError = function( code ) {
+        console.log("onError");
+    };
+    */
+
+
+    uploader.on( 'all', function( type ) {
+        console.log(type);
+    });
+
+    uploader.on( 'uploadStart', function(file) {
+        console.log(type);
+    });
+
+
+    /*
+    //上传之前计算文件的MD5
+    uploader.on( 'beforeFileQueued', function(file ) {
+        
+        console.log("beforeFileQueued");
+    });
+
+    */
+
+
+
+    // 文件上传过程中创建进度条实时显示。
+//    uploader.on( 'uploadProgress', function( file, percentage ) {
+        /*
+        var $li = $( '#'+file.id ),
+            $percent = $li.find('.progress span');
+
+        // 避免重复创建
+        if ( !$percent.length ) {
+            $percent = $('<p class="progress"><span></span></p>')
+                .appendTo( $li )
+                .find('span');
+        }
+        $percent.css( 'width', percentage * 100 + '%' );
+        */
+//       console.log(percentage*100+'%');
+//
+//    });
+
+//    // 文件上传成功，给item添加成功class, 用样式标记上传成功。
+//    uploader.on( 'uploadSuccess', function( file ) {
+//        //$( '#'+file.id ).addClass('upload-state-done');
+//        console.log("success");
+//    });
+//
+//    // 文件上传失败，显示上传出错。
+//    uploader.on( 'uploadError', function( file ) {
+
+        /*
+        var $li = $( '#'+file.id ),
+            $error = $li.find('div.error');
+
+        // 避免重复创建
+        if ( !$error.length ) {
+            $error = $('<div class="error"></div>').appendTo( $li );
+        }
+
+        $error.text('上传失败');
+
+        */
+//        console.log("error");
+//    });
+
+//    // 完成上传完了，成功或者失败，先删除进度条。
+//    uploader.on( 'uploadComplete', function( file ) {
+//      //  $( '#'+file.id ).find('.progress').remove();
+//        console.log("complete");
+//    });
+</script>
+</html>
