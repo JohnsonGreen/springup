@@ -224,8 +224,7 @@ public class IndexController {
             }
         }
     }
-
-
+    
     //删除文件夹下的分块
     private void delete(File file){
        if(file.isDirectory()){
@@ -264,6 +263,7 @@ public class IndexController {
                         }
 
                         /**************************验证分块是否存在*****************************/
+                        /*
                         int i = 0;
                         for (; i < fileArray.length; i++) {
                             String numstr = (fileArray[i].getName().split("\\."))[1];
@@ -275,6 +275,7 @@ public class IndexController {
                         }
                         if (i == fileArray.length)
                             map.put("chunkExist", false);
+                            */
                         /**************************验证分块*****************************/
 
 
