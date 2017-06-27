@@ -91,19 +91,20 @@ public class IndexController {
                        @RequestParam(value = "chunk", required = false) Integer chunk,             //第几个块
                        @RequestParam(value = "chunkSize", required = false) Long chunkSize,        //块的大小
                        @RequestParam(value = "suffix", required = false) String suffix,           //文件后缀名
-                       @RequestParam(value = "merge",required = false) Boolean merge              //合并信号
+                       @RequestParam(value = "merge",required = false) Boolean merge,              //合并信号
+                       @RequestParam(value = "cancel",required = false) Boolean cancel             //取消文件上传，删除已上传分块
                                    ) throws IOException, NoSuchAlgorithmException, Exception {
 
        Feedback feedback = new Feedback();
 
         // 文件上传后的路径
         String filePath = "H:\\upload\\";
+        String mergeDir = filePath+fileMd5;
         if (file == null && suffix != null && merge == null) {                           //存在suffix且合并信号为空说明是验证行为，不是上传行为
-            //  JsonObject jo = verify( filePath, suffix, fileMd5,  chunk,  chunkSize);
             feedback  = verify(filePath, suffix, fileMd5, chunk, chunkSize);
             return feedback;
         } else if (suffix != null && merge != null && merge == true) {                   //存在suffix且合并行为为true说明是合并行为,注意先判空再比较，否则会报空指针异常
-            String mergeDir = filePath+fileMd5;
+
             File exdir =  new File(mergeDir);
             File[] fileArray = exdir.listFiles();
             if(fileArray.length > 1)
@@ -154,11 +155,8 @@ public class IndexController {
             out.println("上传的后缀名为：" + suffixName);
         }
 
-        //JsonObject  json = new JsonObject();
         Map<String, Boolean> ma = new HashMap<String, Boolean>();
         if (file.isEmpty()) {
-            //json.addProperty("error",true);
-            //json.addProperty("info","上传文件为空！");
             ma.put("error", true);
             feedback.setExist(ma);
             return feedback;
@@ -172,8 +170,6 @@ public class IndexController {
         }
         try {
             file.transferTo(dest);
-            //json.addProperty("error",false);
-            // json.addProperty("info","上传成功！");
             ma.put("error", false);
             feedback.setExist(ma);
             return feedback;
@@ -183,15 +179,25 @@ public class IndexController {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        // json.addProperty("error",true);
-        //  json.addProperty("info","上传失败！");
+
         ma.put("error", true);
         feedback.setExist(ma);
         return feedback;
     }
 
 
-    //合并分块
+    //必须等文件上传完毕才能合并，因为多线程上传文件序号不同
+//    public void mergeChunk(String outFileName, File chunk) throws IOException {
+//         File file = new File(outFileName);
+//         if(!file.exists())
+//             file.createNewFile();
+//         File [] files = new File[1];
+//         files[0] = chunk;
+//         mergeFiles(file.getAbsolutePath(),files);
+//    }
+
+
+    //等所有分块都上传完毕才合并，对大文件较慢
     public Boolean mergeFiles(String outFile, File[] files) {
         int BUFSIZE = 1024 * 1024 * 5;
         FileChannel outChannel = null;
@@ -224,7 +230,7 @@ public class IndexController {
             }
         }
     }
-    
+
     //删除文件夹下的分块
     private void delete(File file){
        if(file.isDirectory()){

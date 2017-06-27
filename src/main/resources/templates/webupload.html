@@ -6,9 +6,10 @@
     <!--<link rel="stylesheet" type="text/css" href="/webuploader/webuploader.css"/>-->
     <link rel="stylesheet" type="text/css" href="/css/bootstrap.min.css" />
     <link rel="stylesheet" type="text/css" href="/css/fileinput.css" />
+    <link rel="stylesheet" type="text/css" href="/css/docs.css" />
     <style>
         .progress-float{
-            position:absolute;
+            /*position:absolute;*/
             width:600px;
         }
 
@@ -18,6 +19,10 @@
 
         .display-none{
             display:none;
+        }
+
+        .margin{
+           margin: 10px;
         }
     </style>
 </head>
@@ -42,51 +47,56 @@
             <div class="row" >
                 <div class="col-md-2"></div>
                 <div class="col-md-8 col-sm-12">
-                    <div class="col-md-12 " style="height:50px;">
-                        <div class="progress-father">
-                            <div class="progress-float">
+                    <div class="col-md-12 margin">
+                        <!--<div class="progress-father">-->
+                            <!--<div class="progress-float">-->
                                 <div class="input-group">
                                     <div tabindex="-1" class="form-control">
                                     </div>
                                     <div class="input-group-btn">
-                                        <div id="filePicker" class="btn btn-primary btn-file"><i class="glyphicon glyphicon-folder-open"></i> &nbsp;上传
+                                        <div id="filePicker" class="btn btn-lg btn-outline btn-file"><i class="glyphicon glyphicon-folder-open"></i> &nbsp;上传
                                             <input id="fileToUpload" class="file" type="file" multiple="" data-preview-file-type="any"
                                                    data-upload-url="#"  data-preview-file-icon=""></div>
                                     </div>
                                 </div>
-                            </div>
-
-                            <div id="progress" class="progress-float display-none">
-                                <div class="input-group">
-                                    <div class="progress form-control">
-                                        <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="100" style="min-width: 2em; width: 2%; display:inline;">
-                                            2%
-                                        </div>
-                                    </div>
-                                    <div class="input-group-btn">
-                                        <div class="btn btn-primary btn-file"><i class="glyphicon glyphicon-folder-open"></i> &nbsp;取消
-                                            <input id="file-6" class="file" type="file" multiple="" data-preview-file-type="any"
-                                                   data-upload-url="#"  data-preview-file-icon=""></div>
-                                    </div>
-                                </div>
+                            <!--</div>-->
+                        </div>
+                    <!--</div>-->
+                    <div class="col-md-12 margin">
+                    <div id="progress" class="display-none">
+                        <!--<div class="input-group">-->
+                        <div class="progress">
+                            <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuenow="2" aria-valuemin="0" aria-valuemax="100" style="background-color: #563d7c; height:2em;min-width: 2em; width: 2%; display:inline;">
+                                2%
                             </div>
                         </div>
+                        <!--</div>-->
                     </div>
-                    <div class="col-md-12">
-                        <div class="col-md-12">
+                    </div>
+
+
+                        <div class="col-md-12 margin" style="height:55px;">
+                            <div class="col-md-2">
+                              <button class="cyh-cancel btn btn-lg btn-outline " style="margin:0 auto;" >取消</button>
+                            </div>
+                            <div class="col-md-8"></div>
+                            <div class="col-md-2">
+                                <button class="cyh-pause btn btn-lg btn-outline" style="margin:0 auto;" data-bind="pause">暂停</button>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12 margin">
                             <div id="fileName"></div>
                             <div id="fileSize"></div>
                             <div id="fileType"></div>
                         </div>
-
-                        <div class="col-md-12">
+                        <div class="col-md-12 margin">
                             <div id="item1">
                                 <p class="state">
                                 </p>
                             </div>
                         </div>
 
-                    </div>
                 </div>
 
                 <div class="col-md-2"></div>
@@ -102,6 +112,8 @@
 <script type="text/javascript" src="/js/jquery.js"></script>
 <script type="text/javascript" src="/webuploader/webuploader.js"></script>
 <script>
+
+
     var BASE_URL = "http://localhost:8011";
     var UPLOADFUNC = "/upload";
     var fileMd5;
@@ -109,9 +121,49 @@
     var fileExist = false;       //文件存在全局变量
     var numChunks;
 
-    function info(text){
+
+    function info(text){       //提示信息
         $("#progress-bar").text(text);
     };
+
+
+    function cancel(uploader,file){
+        if( !(!!$(".cyh-cancel").data("events") && !!$(".cyh-cancel").data("events")["click"])){
+            $(".cyh-cancel").click(function(){
+                uploader.cancelFile( file );
+                $.ajax({
+                    type: "POST",
+                    url: BASE_URL + UPLOADFUNC,
+                    data: {
+                        file: fileMd5,                         //文件唯一标记
+                        cancel: true,                         //文件后缀名
+                    },
+                    async: true,                                //注意，这里是同步请求，也就是请求完毕后才执行$.ajax后面的函数
+                    dataType: "json",
+                    success: function (response) {
+                        alert("删除成功");
+                    }
+                });
+            });
+        }
+    }
+
+    function pause(uploader,file){
+        if( ! (!!$(".cyh-pause").data("events") &&  !!$(".cyh-pause").data("events")["click"])) {
+            $(".cyh-pause").click(function () {
+                if ($(".cyh-pause").attr("data-bind") == "pause") {
+                    uploader.stop(true);
+                    $(".cyh-pause").text("继续");
+                    $(".cyh-pause").attr("data-bind", "continue");
+                }
+                else {
+                    uploader.upload(file);
+                    $(".cyh-pause").text("暂停");
+                    $(".cyh-pause").attr("data-bind", "pause");
+                }
+            });
+        }
+    }
 
     //二分搜索查找分块
     function binarySearch(arr,key){
@@ -173,6 +225,10 @@
                                 console.log('文件重复，已跳过');
                             }
                             numChunks = response.chunks;
+                            console.log(file);
+                            pause(owner,file);    //暂停
+                            cancel(owner,file);    //取消文件
+
                             deferred.resolve();    // 介绍此promise, webuploader接着往下走。
                         }
                     });
@@ -257,10 +313,9 @@
             }
 
             fileExist = false;                        //一个文件上传完毕后置文件不存在标志位false
+            this.owner.reset();  //重置队列
         }
     });
-
-
 
     var log = (function () {
         var dom = $('#item1 p.state');
@@ -286,6 +341,7 @@
         chunkSize: 5 * 1024 * 1024,
         chunkRetry: 2,    //允许重传
         threads: 5,
+        duplicate:true,
         fileNumLimit: 300,
         fileSizeLimit: 2000 * 1024 * 1024,    // 2000 M
         fileSingleSizeLimit: 4 * 500 * 1024 * 1024,    // 2000 M
