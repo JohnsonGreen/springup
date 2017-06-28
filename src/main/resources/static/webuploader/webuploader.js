@@ -3489,9 +3489,11 @@
              * @method upload
              * @for  Uploader
              */
-            startUpload: function(file) {
+            startUpload: function(file,m) {
                 var me = this;
-    
+                if(m != undefined)
+                    me = m;
+
                 // 移出invalid的文件
                 $.each( me.request( 'get-files', Status.INVALID ), function() {
                     me.request( 'remove-file', this );
@@ -3500,16 +3502,16 @@
                 // 如果指定了开始某个文件，则只开始指定文件。
                 if ( file ) {
                     file = file.id ? file : me.request( 'get-file', file );
-    
-                    if (file.getStatus() === Status.INTERRUPT) {
+                     var statu = file.getStatus();
+                    if (statu === Status.INTERRUPT) {
                         $.each( me.pool, function( _, v ) {
     
                             // 之前暂停过。
-                            if (v.file !== file) {
+                            if ( v == undefined || v.file !== file) {
                                 return;
                             }
     
-                            v.transport && v.transport.send();
+                            v.transport && v.transport.send();   //&&也是具有短路特性，即当expression1为false时，那么expression2将不会在被执行。
                         });
     
                         file.setStatus( Status.QUEUED );
@@ -3535,8 +3537,8 @@
                 // 如果有暂停的，则续传
                 $.each( me.pool, function( _, v ) {
                     var file = v.file;
-    
-                    if ( file.getStatus() === Status.INTERRUPT ) {
+                    var statu = file.getStatus();
+                    if ( statu === Status.INTERRUPT ) {
                         files.push(file);
                         me._trigged = false;
                         v.transport && v.transport.send();
@@ -3575,7 +3577,7 @@
              * @for  Uploader
              */
             stopUpload: function( file, interrupt ) {
-                var me = this;
+                var me = this;    //全局对象
     
                 if (file === true) {
                     interrupt = file;
@@ -3599,15 +3601,15 @@
                     $.each( me.pool, function( _, v ) {
     
                         // 只 abort 指定的文件。
-                        if (v.file !== file) {
+                        if ( v == undefined || v.file !== file) {
                             return;
                         }
     
                         v.transport && v.transport.abort();
                         me._putback(v);
-                        me._popBlock(v);
+                        me._popBlock(v);       //让出位置，让其他分片上传
                     });
-    
+
                     return Base.nextTick( me.__tick );
                 }
     
@@ -3617,12 +3619,13 @@
                     this._promise.file.setStatus( Status.INTERRUPT );
                 }
     
-                interrupt && $.each( me.pool, function( _, v ) {
+                /*interrupt &&*/ $.each( me.pool, function( _, v ) {
                     v.transport && v.transport.abort();
                     v.file.setStatus( Status.INTERRUPT );
                 });
     
                 me.owner.trigger('stopUpload');
+
             },
     
             /**

@@ -109,7 +109,7 @@ public class IndexController {
             File[] fileArray = exdir.listFiles();
             if(fileArray.length > 1)
                   Arrays.sort(fileArray, new ByNumComparator());             //对分块按照序号排序
-            Boolean mergeBool = mergeFiles(mergeDir+"."+suffix, fileArray);
+            Boolean mergeBool = mergeFiles(filePath,fileMd5,suffix, fileArray);
             Map<String,Boolean> mergeMap = new HashMap<String,Boolean>();
             if(mergeBool){
                delete(new File(mergeDir));       //删除文件夹下的文件
@@ -198,12 +198,18 @@ public class IndexController {
 
 
     //等所有分块都上传完毕才合并，对大文件较慢
-    public Boolean mergeFiles(String outFile, File[] files) {
+    public Boolean mergeFiles(String filePath,String fileMd5,String suffix, File[] files) {
         int BUFSIZE = 1024 * 1024 * 5;
+        String mergeDir = filePath+fileMd5;
+        String outFile = mergeDir + "." + suffix;
+        String outTemp = mergeDir + ".tmp";       //合并时的临时文件
+        File outTempFile = new File(outTemp);
+        if(outTempFile.exists())                 //临时文件存在则删除
+            delete(outTempFile);
+
         FileChannel outChannel = null;
-        out.println("Merge " + Arrays.toString(files) + " into " + outFile);
         try {
-            outChannel = new FileOutputStream(outFile).getChannel();
+            outChannel = new FileOutputStream(outTempFile).getChannel();
             for (File f : files) {
                 String absolutePath = f.getAbsolutePath();
 
@@ -216,18 +222,16 @@ public class IndexController {
                 }
                 fc.close();
             }
+            if (outChannel != null) {
+                outChannel.close();
+            }
+            outTempFile.renameTo(new File(outFile));
             out.println("Merged!! ");
             return true;
         } catch (IOException ioe) {
             ioe.printStackTrace();
             return false;
         } finally {
-            try {
-                if (outChannel != null) {
-                    outChannel.close();
-                }
-            } catch (IOException ignore) {
-            }
         }
     }
 
@@ -260,7 +264,7 @@ public class IndexController {
                     File[] fileArray = exdir.listFiles();
                     if(fileArray != null){
                         if(fileArray.length > 0){
-                           // String [] md5Chunks = new String[fileArray.length];            //获取每个分块的md5码
+                           // String [] md5Chunks = new String[fileArray.length];            //获取每个分块的序号
                             Integer [] chunks = new Integer[fileArray.length];
                             for(int j = 0;j < chunks.length;j++)
                                 chunks[j] = Integer.parseInt((fileArray[j].getName().split("\\.")[1]).substring(1));
