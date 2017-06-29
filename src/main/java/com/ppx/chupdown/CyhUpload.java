@@ -12,6 +12,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 import org.springframework.web.multipart.MultipartFile;
@@ -41,7 +42,7 @@ public class CyhUpload {
      * @return
      * @throws Exception
      */
-    public Feedback upload(String filePath, MultipartFile file,CyhParaters cp) throws Exception {
+    public Feedback upload(String filePath, MultipartFile file,CyhParaters cp) throws CyhUploadException, NoSuchAlgorithmException, IOException {
 
         String fileMd5 = cp.getFileMd5();
         Integer chunk = cp.getChunk();
@@ -60,7 +61,7 @@ public class CyhUpload {
         if (file == null && suffix != null && merge == null) {                           //存在suffix且合并信号为空说明是验证行为，不是上传行为
             feedback = verify(filePath, suffix, fileMd5, chunk, chunkSize);
             return feedback;
-        } else if (suffix != null && merge != null && merge == true) {                   //存在suffix且合并行为为true说明是合并行为,注意先判空再比较，否则会报空指针异常
+        } else if (suffix != null && merge != null && merge == true) {                   //存在suffix且合并行为为true说明是合并行为,合并行为包括分块合并和不分块修改临时文件为正式文件，注意先判空再比较，否则会报空指针异常
             fileInfo = setFileInfo(file, cp);                                           //合并完成后获取文件信息
             return mergeSupport(mergeDir,filePath,fileMd5,suffix);
         }
@@ -74,24 +75,17 @@ public class CyhUpload {
             byte[] digest = md5.digest(uploadBytes);
             md5Chunk = new BigInteger(1, digest).toString(16).toUpperCase();
             hashName = md5Chunk + "._" + chunk.toString() + ".tmp";      //分块时，文件名为分块的hash码
-        } else {
+        } else {                                 //不是分块上传
             hashName += "._" + 0 + ".tmp";
         }
-        String fileName = "";  //文件名
-        if (fileMd5 != null) {                      //包含文件的MD5,说明要判断是否存在文件目录
-            fileName = hashName;
+
+        String fileName = hashName;  //文件名
+        if (fileMd5 != null) {                      //分块上传
             filePath += fileMd5 + "\\";
             File dir = new File(filePath);
             if (!dir.exists())                      //创建hash目录
                 if (!dir.mkdirs())
-                    throw new Exception("目录创建不成功，请重试！");
-        } else {
-            String[] strarr = file.getOriginalFilename().split("\\\\");              // 获取文件名
-            //String realFileName = fileName.substring(fileName.lastIndexOf("\\"));
-            fileName = strarr[strarr.length - 1];
-            out.println("上传的文件名为：" + fileName);
-            String suffixName = fileName.substring(fileName.lastIndexOf("."));          // 获取文件的后缀名
-            out.println("上传的后缀名为：" + suffixName);
+                    throw new CyhUploadException("目录创建不成功，请重试！");
         }
 
         Map<String, Boolean> ma = new HashMap<String, Boolean>();
@@ -180,16 +174,27 @@ public class CyhUpload {
     private Feedback mergeSupport(String mergeDir,String filePath,String fileMd5,String suffix){
         Feedback feedback = new Feedback();
         File exdir = new File(mergeDir);
-        File[] fileArray = exdir.listFiles();
-        if (fileArray.length > 1)
-            Arrays.sort(fileArray, new ByNumComparator());             //对分块按照序号排序
-        Boolean mergeBool = mergeFiles(filePath, fileMd5, suffix, fileArray);
+        File[] fileArray = new File[1];      //新建空文件数组
+        Boolean isChunked = false;
+        if(exdir.exists()){                  //存在文件夹则为分块
+            isChunked = true;
+            fileArray = exdir.listFiles();
+            if (fileArray.length > 1)
+                Arrays.sort(fileArray, new ByNumComparator());             //对分块按照序号排序
+        }
+
+        Boolean mergeBool = mergeFiles(filePath, fileMd5, suffix, fileArray,isChunked);
         Map<String, Boolean> mergeMap = new HashMap<String, Boolean>();
         if (mergeBool) {
-            delete(new File(mergeDir));       //删除文件夹下的文件
+            File dirFile = new File(mergeDir);
+            if(dirFile.exists()) delete(dirFile);       //删除文件夹下的文件
             mergeMap.put("mergeSuccess", true);
         } else {
             // throw new Exception("合并失败！");
+            File tmpFile = new File(mergeDir+".tmp");
+            if(tmpFile.exists()){                //没有合并成功的临时文件如果存在，则删除
+              delete(tmpFile);
+            }
             mergeMap.put("mergeSuccess", false);
         }
         feedback.setExist(mergeMap);
@@ -205,33 +210,35 @@ public class CyhUpload {
      * @param files
      * @return
      */
-    private Boolean mergeFiles(String filePath, String fileMd5, String suffix, File[] files) {
+    private Boolean mergeFiles(String filePath, String fileMd5, String suffix, File[] files,Boolean isChunked) {
         int BUFSIZE = 1024 * 1024 * 5;
         String mergeDir = filePath + fileMd5;
         String outFile = mergeDir + "." + suffix;
         String outTemp = mergeDir + ".tmp";       //合并时的临时文件
         File outTempFile = new File(outTemp);
-        if (outTempFile.exists())                 //临时文件存在则删除
+        if (isChunked && outTempFile.exists())                 //分块临时文件存在则删除
             delete(outTempFile);
 
         FileChannel outChannel = null;
         try {
-            outChannel = new FileOutputStream(outTempFile).getChannel();
-            for (File f : files) {
-                String absolutePath = f.getAbsolutePath();
-
-                FileChannel fc = new FileInputStream(absolutePath).getChannel();
-                ByteBuffer bb = ByteBuffer.allocate(BUFSIZE);
-                while (fc.read(bb) != -1) {
-                    bb.flip();
-                    outChannel.write(bb);
-                    bb.clear();
+            if(isChunked){
+                outChannel = new FileOutputStream(outTempFile).getChannel();
+                for (File f : files) {
+                    String absolutePath = f.getAbsolutePath();
+                    FileChannel fc = new FileInputStream(absolutePath).getChannel();
+                    ByteBuffer bb = ByteBuffer.allocate(BUFSIZE);
+                    while (fc.read(bb) != -1) {
+                        bb.flip();
+                        outChannel.write(bb);
+                        bb.clear();
+                    }
+                    fc.close();
                 }
-                fc.close();
+                if (outChannel != null) {
+                    outChannel.close();
+                }
             }
-            if (outChannel != null) {
-                outChannel.close();
-            }
+
             outTempFile.renameTo(new File(outFile));
             out.println("Merged!! ");
             return true;
@@ -299,13 +306,57 @@ public class CyhUpload {
         return feedback;
     }
 
+    public static String download(String fileName, HttpServletResponse response){
+        if (fileName != null) {
+            File file = new File(fileName);
+            if (file.exists()) {
+                response.setContentType("application/force-download");// 设置强制下载不打开
+                response.addHeader("Content-Disposition",
+                        "attachment;fileName=" + fileName);// 设置文件名
+                byte[] buffer = new byte[1024];
+                FileInputStream fis = null;
+                BufferedInputStream bis = null;
+                try {
+                    fis = new FileInputStream(file);
+                    bis = new BufferedInputStream(fis);
+                    OutputStream os = response.getOutputStream();
+                    int i = bis.read(buffer);
+                    while (i != -1) {
+                        os.write(buffer, 0, i);
+                        i = bis.read(buffer);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    if (bis != null) {
+                        try {
+                            bis.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    if (fis != null) {
+                        try {
+                            fis.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+
 
     public CyhFile getFileInfo(){
         return fileInfo;
     }
 
+
     /**
-     * 内部类：目的是将File数组从小到大排序
+     * 内部类：目的是将File数组按照序号从小到大排序
      */
     class ByNumComparator implements Comparator {
         @Override
@@ -320,14 +371,6 @@ public class CyhUpload {
                 return 0;
         }
     }
-
-
-
-    //产生唯一文件名
-    public String geneUniqueName(String suffix){
-        return UUID.randomUUID()+"."+suffix;
-    }
-
 
 }
 

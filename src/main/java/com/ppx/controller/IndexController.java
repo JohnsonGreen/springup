@@ -4,6 +4,7 @@ import com.ppx.chupdown.CyhFile;
 import com.ppx.chupdown.CyhParaters;
 import com.ppx.chupdown.CyhUpload;
 import com.ppx.pojo.Feedback;
+import com.sun.org.apache.xalan.internal.xsltc.dom.AbsoluteIterator;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -49,44 +50,6 @@ public class IndexController {
         return "webupload";
     }
 
-    @RequestMapping("/upload2")
-    public String upload2(HttpServletRequest request, HttpServletResponse response) throws IllegalStateException, IOException {
-        //创建一个通用的多部分解析器
-        CommonsMultipartResolver multipartResolver = new CommonsMultipartResolver(request.getSession().getServletContext());
-        //判断 request 是否有文件上传,即多部分请求
-        if (multipartResolver.isMultipart(request)) {
-            //转换成多部分request
-            MultipartHttpServletRequest multiRequest = (MultipartHttpServletRequest) request;
-            //取得request中的所有文件名
-            Iterator<String> iter = multiRequest.getFileNames();
-            while (iter.hasNext()) {
-                //记录上传过程起始时的时间，用来计算上传时间
-                int pre = (int) System.currentTimeMillis();
-                //取得上传文件
-                MultipartFile file = multiRequest.getFile(iter.next());
-                if (file != null) {
-                    //取得当前上传文件的文件名称
-                    String myFileName = file.getOriginalFilename();
-                    //如果名称不为“”,说明该文件存在，否则说明该文件不存在
-                    if (myFileName.trim() != "") {
-                        out.println(myFileName);
-                        //重命名上传后的文件名
-                        String fileName = "demoUpload" + file.getOriginalFilename();
-                        //定义上传路径
-                        String path = "H:/" + fileName;
-                        File localFile = new File(path);
-                        file.transferTo(localFile);
-                    }
-                }
-                //记录上传该文件后的时间
-                int finaltime = (int) System.currentTimeMillis();
-                out.println(finaltime - pre);
-            }
-
-        }
-        return "/success";
-    }
-
 
 //    @RequestParam(value = "fileMd5", required = false) String fileMd5,          //文件的MD5码
 //    @RequestParam(value = "chunk", required = false) Integer chunk,             //第几个块
@@ -113,7 +76,11 @@ public class IndexController {
        return  feedback;
     }
 
-
-
-
+    @RequestMapping("/download")
+    public String downloadFile(@RequestParam("fileName") String fileName,
+                               HttpServletRequest request, HttpServletResponse response) {
+        String filePath = "H:\\upload\\";                          // 文件上传后的路径
+        String absoluteName = filePath+"\\" + fileName;
+       return  CyhUpload.download(absoluteName,response);
+    }
 }
