@@ -1,5 +1,7 @@
 package com.ppx.controller;
 
+import com.ppx.chupdown.CyhFile;
+import com.ppx.chupdown.CyhParaters;
 import com.ppx.pojo.Feedback;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -84,62 +86,62 @@ public class IndexController {
         return "/success";
     }
 
+
+//    @RequestParam(value = "fileMd5", required = false) String fileMd5,          //文件的MD5码
+//    @RequestParam(value = "chunk", required = false) Integer chunk,             //第几个块
+//    @RequestParam(value = "chunkSize", required = false) Long chunkSize,        //块的大小
+//    @RequestParam(value = "suffix", required = false) String suffix,           //文件后缀名
+//    @RequestParam(value = "merge",required = false) Boolean merge,              //合并信号
+//    @RequestParam(value = "cancel",required = false) Boolean cancel             //取消文件上传，删除已上传分块
+
     @RequestMapping("/upload")
     @ResponseBody
-    public Feedback up(@RequestParam(value = "fileToUpload", required = false) MultipartFile file,
-                       @RequestParam(value = "fileMd5", required = false) String fileMd5,          //文件的MD5码
-                       @RequestParam(value = "chunk", required = false) Integer chunk,             //第几个块
-                       @RequestParam(value = "chunkSize", required = false) Long chunkSize,        //块的大小
-                       @RequestParam(value = "suffix", required = false) String suffix,           //文件后缀名
-                       @RequestParam(value = "merge",required = false) Boolean merge,              //合并信号
-                       @RequestParam(value = "cancel",required = false) Boolean cancel             //取消文件上传，删除已上传分块
-                                   ) throws IOException, NoSuchAlgorithmException, Exception {
+    public Feedback up(
+            @RequestParam(value = "fileToUpload", required = false) MultipartFile file,
+            CyhParaters cp
+    ) throws IOException, NoSuchAlgorithmException, Exception {
 
-       Feedback feedback = new Feedback();
+        CyhFile fileInfo = setFileInfo(file, cp);
 
-        // 文件上传后的路径
-        String filePath = "H:\\upload\\";
-        String mergeDir = filePath+fileMd5;
+
+        String filePath = "H:\\upload\\";   // 文件上传后的路径
+
+        String fileMd5 = cp.getFileMd5();
+        Integer chunk = cp.getChunk();
+        Long chunkSize = cp.getChunkSize();
+        String suffix = cp.getSuffix();
+        Boolean merge = cp.getMerge();
+        Boolean cancel = cp.getCancel();
+
+        Feedback feedback = new Feedback();
+        String mergeDir = filePath + fileMd5;
+
+        if (cancel != null && cancel == true) {  //取消文件上传并删除
+            return cancelUpload(mergeDir);
+        }
+
         if (file == null && suffix != null && merge == null) {                           //存在suffix且合并信号为空说明是验证行为，不是上传行为
-            feedback  = verify(filePath, suffix, fileMd5, chunk, chunkSize);
+            feedback = verify(filePath, suffix, fileMd5, chunk, chunkSize);
             return feedback;
         } else if (suffix != null && merge != null && merge == true) {                   //存在suffix且合并行为为true说明是合并行为,注意先判空再比较，否则会报空指针异常
-
-            File exdir =  new File(mergeDir);
-            File[] fileArray = exdir.listFiles();
-            if(fileArray.length > 1)
-                  Arrays.sort(fileArray, new ByNumComparator());             //对分块按照序号排序
-            Boolean mergeBool = mergeFiles(filePath,fileMd5,suffix, fileArray);
-            Map<String,Boolean> mergeMap = new HashMap<String,Boolean>();
-            if(mergeBool){
-               delete(new File(mergeDir));       //删除文件夹下的文件
-                mergeMap.put("mergeSuccess",true);
-            }else{
-               // throw new Exception("合并失败！");
-                mergeMap.put("mergeSuccess",false);
-            }
-            feedback.setExist(mergeMap);
-            return feedback;
+            return mergeSupport(mergeDir,filePath,fileMd5,suffix);
         }
+
 
         //获取文件的hash名
         String hashName = fileMd5;   //为完整文件时
         String md5Chunk = "";
         if (fileMd5 != null && chunk != null) {   //说明是分块上传
             byte[] uploadBytes = file.getBytes();
-            /*******************************计算文件的MD5值*******************************************/
-            MessageDigest md5 = MessageDigest.getInstance("MD5");
+            MessageDigest md5 = MessageDigest.getInstance("MD5");   //计算文件的MD5值
             byte[] digest = md5.digest(uploadBytes);
             md5Chunk = new BigInteger(1, digest).toString(16).toUpperCase();
-            /*******************************计算文件的MD5值*******************************************/
-            hashName = md5Chunk + "._" + chunk.toString() + ".tmp";   //分块时，文件名为分块的hash码
-        }else{
-            hashName +="._"+0+".tmp";
+            hashName = md5Chunk + "._" + chunk.toString() + ".tmp";      //分块时，文件名为分块的hash码
+        } else {
+            hashName += "._" + 0 + ".tmp";
         }
-
         String fileName = "";  //文件名
-
-        if (fileMd5 != null){                      //包含文件的MD5,说明要校验是否包含文件
+        if (fileMd5 != null) {                      //包含文件的MD5,说明要判断是否存在文件目录
             fileName = hashName;
             filePath += fileMd5 + "\\";
             File dir = new File(filePath);
@@ -162,7 +164,6 @@ public class IndexController {
             return feedback;
         }
 
-        // fileName = UUID.randomUUID() + suffixName;
         File dest = new File(filePath + fileName);
         // 检测是否存在目录
         if (!dest.getParentFile().exists()) {
@@ -186,25 +187,63 @@ public class IndexController {
     }
 
 
-    //必须等文件上传完毕才能合并，因为多线程上传文件序号不同
-//    public void mergeChunk(String outFileName, File chunk) throws IOException {
-//         File file = new File(outFileName);
-//         if(!file.exists())
-//             file.createNewFile();
-//         File [] files = new File[1];
-//         files[0] = chunk;
-//         mergeFiles(file.getAbsolutePath(),files);
-//    }
+    //取消文件上传删除可能存在的临时文件
+    private Feedback cancelUpload(String mergeDir){
+        Feedback feedback = new Feedback();
+        File tpFile = new File(mergeDir + ".tmp");
+        if (tpFile.exists())    //删除临时文件，合并不完整的临时文件
+            delete(tpFile);
+        Map<String, Boolean> map = new HashMap<String, Boolean>();
+        map.put("cancelSuccess", true);
+        feedback.setExist(map);
+        return feedback;
+    }
+
+    private CyhFile setFileInfo(MultipartFile file, CyhParaters cp) {
+        if (file != null) {
+            CyhFile fileInfo = new CyhFile();
+            fileInfo.setContentType(file.getContentType());//获取文件MIME类型
+            String originName = file.getOriginalFilename();
+            String[] strArr = originName.split("\\\\");
+            String fileName = strArr[strArr.length - 1];
+            fileInfo.setFileName(fileName);
+            String[] nameArr = fileName.split("\\.");
+            fileInfo.setExtensionName(nameArr[nameArr.length - 1]);
+            fileInfo.setFileSize(cp.getFileSize());
+            return fileInfo;
+        } else
+            return null;
+    }
+
+    //对文件合并进一步包装
+    private Feedback mergeSupport(String mergeDir,String filePath,String fileMd5,String suffix){
+        Feedback feedback = new Feedback();
+        File exdir = new File(mergeDir);
+        File[] fileArray = exdir.listFiles();
+        if (fileArray.length > 1)
+            Arrays.sort(fileArray, new ByNumComparator());             //对分块按照序号排序
+        Boolean mergeBool = mergeFiles(filePath, fileMd5, suffix, fileArray);
+        Map<String, Boolean> mergeMap = new HashMap<String, Boolean>();
+        if (mergeBool) {
+            delete(new File(mergeDir));       //删除文件夹下的文件
+            mergeMap.put("mergeSuccess", true);
+        } else {
+            // throw new Exception("合并失败！");
+            mergeMap.put("mergeSuccess", false);
+        }
+        feedback.setExist(mergeMap);
+        return feedback;
+    }
 
 
     //等所有分块都上传完毕才合并，对大文件较慢
-    public Boolean mergeFiles(String filePath,String fileMd5,String suffix, File[] files) {
+    private Boolean mergeFiles(String filePath, String fileMd5, String suffix, File[] files) {
         int BUFSIZE = 1024 * 1024 * 5;
-        String mergeDir = filePath+fileMd5;
+        String mergeDir = filePath + fileMd5;
         String outFile = mergeDir + "." + suffix;
         String outTemp = mergeDir + ".tmp";       //合并时的临时文件
         File outTempFile = new File(outTemp);
-        if(outTempFile.exists())                 //临时文件存在则删除
+        if (outTempFile.exists())                 //临时文件存在则删除
             delete(outTempFile);
 
         FileChannel outChannel = null;
@@ -236,13 +275,13 @@ public class IndexController {
     }
 
     //删除文件夹下的分块
-    private void delete(File file){
-       if(file.isDirectory()){
-           File[] files = file.listFiles();
-           for(int i=0;i < files.length;i++)
-               delete(files[i]);
-       }
-       file.delete();
+    private void delete(File file) {
+        if (file.isDirectory()) {
+            File[] files = file.listFiles();
+            for (int i = 0; i < files.length; i++)
+                delete(files[i]);
+        }
+        file.delete();
     }
 
 
@@ -251,51 +290,31 @@ public class IndexController {
 
         Map<String, Boolean> map = new HashMap<String, Boolean>();
         Feedback feedback = new Feedback();
-        String fileDir = filePath+fileMd5;
+        String fileDir = filePath + fileMd5;
         File exfile = new File(fileDir + "." + suffix);
         if (exfile.exists()) {    //存在上传好的大文件
             map.put("fileExist", true);
         } else {
             map.put("fileExist", false);
-           // if (chunk != null && chunkSize != null) {
-                File exdir = new File(fileDir);
-                if (exdir.exists()) {
-                    map.put("fileDirExist", true);
-                    File[] fileArray = exdir.listFiles();
-                    if(fileArray != null){
-                        if(fileArray.length > 0){
-                           // String [] md5Chunks = new String[fileArray.length];            //获取每个分块的序号
-                            Integer [] chunks = new Integer[fileArray.length];
-                            for(int j = 0;j < chunks.length;j++)
-                                chunks[j] = Integer.parseInt((fileArray[j].getName().split("\\.")[1]).substring(1));
-                            Arrays.sort(chunks);
-                            feedback.setChunks(chunks);
-                        }
+            File exdir = new File(fileDir);
+            if (exdir.exists()) {
+                map.put("fileDirExist", true);
+                File[] fileArray = exdir.listFiles();
+                if (fileArray != null) {
+                    if (fileArray.length > 0) {
+                        Integer[] chunks = new Integer[fileArray.length];
+                        for (int j = 0; j < chunks.length; j++)
+                            chunks[j] = Integer.parseInt((fileArray[j].getName().split("\\.")[1]).substring(1));
+                        Arrays.sort(chunks);
+                        feedback.setChunks(chunks);
+                    }
 
-                        /**************************验证分块是否存在*****************************/
-                        /*
-                        int i = 0;
-                        for (; i < fileArray.length; i++) {
-                            String numstr = (fileArray[i].getName().split("\\."))[1];
-                            Long chunkLength = fileArray[i].length();
-                            if (chunk.equals(Integer.parseInt(numstr.substring(1))) && chunkSize.equals(chunkLength)) {    //分块序号相等，且分块大小相等
-                                map.put("chunkExist", true);
-                                break;
-                            }
-                        }
-                        if (i == fileArray.length)
-                            map.put("chunkExist", false);
-                            */
-                        /**************************验证分块*****************************/
-
-
-                    }else
-                        map.put("chunkExist", false);
-                } else {
-                    map.put("fileDirExist", false);
+                } else
                     map.put("chunkExist", false);
-                }
-           // }
+            } else {
+                map.put("fileDirExist", false);
+                map.put("chunkExist", false);
+            }
         }
         feedback.setExist(map);
         return feedback;
@@ -303,21 +322,19 @@ public class IndexController {
 
 
     //将File数组从小到大排序
-   class ByNumComparator implements Comparator {
-       @Override
-       public int compare(Object a, Object b) {
-           int  orderA = Integer.parseInt(((((File)a).getName().split("\\."))[1]).substring(1));
-           int  orderB = Integer.parseInt(((((File)b).getName().split("\\."))[1]).substring(1));
-          if(orderA > orderB)
-              return 1;
-          else if(orderA < orderB)
-              return -1;
-          else
-              return 0;
-       }
-   }
-
-
+    class ByNumComparator implements Comparator {
+        @Override
+        public int compare(Object a, Object b) {
+            int orderA = Integer.parseInt(((((File) a).getName().split("\\."))[1]).substring(1));
+            int orderB = Integer.parseInt(((((File) b).getName().split("\\."))[1]).substring(1));
+            if (orderA > orderB)
+                return 1;
+            else if (orderA < orderB)
+                return -1;
+            else
+                return 0;
+        }
+    }
 
 
 }
