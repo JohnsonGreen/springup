@@ -6,9 +6,7 @@ import com.ppx.chupdown.CyhUpload;
 import com.ppx.pojo.Feedback;
 import com.sun.org.apache.xalan.internal.xsltc.dom.AbsoluteIterator;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.multipart.commons.CommonsMultipartResolver;
@@ -76,11 +74,12 @@ public class IndexController {
        return  feedback;
     }
 
-    @RequestMapping("/download")
-    public String downloadFile(@RequestParam("fileName") String fileName,
-                               HttpServletRequest request, HttpServletResponse response) {
+    @RequestMapping(value="/download/{suffix}/{fileName}",method = RequestMethod.GET)
+    public String downloadFile(@PathVariable("suffix")String suffix, @PathVariable("fileName") String fileName, HttpServletResponse response) {
+        System.out.println(fileName+"."+suffix);
         String filePath = "H:\\upload\\";                          // 文件上传后的路径
-        String absoluteName = filePath+"\\" + fileName;
+        String absoluteName = filePath + fileName+"."+suffix;
+        System.out.println(absoluteName);
        return  CyhUpload.download(absoluteName,response);
     }
 }

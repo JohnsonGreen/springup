@@ -130,7 +130,7 @@ var cyhup = function (setUp) {
                             }
                         });
 
-                        !!(setUp.afterMd5) && setUp.afterMd5();
+                        !!(setUp.afterMd5) && setUp.afterMd5(val);
 
                     });
                 return deferred.promise();
