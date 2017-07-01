@@ -3,6 +3,7 @@ package com.ppx.controller;
 import com.ppx.chupdown.CyhFile;
 import com.ppx.chupdown.CyhParaters;
 import com.ppx.chupdown.CyhUpload;
+import com.ppx.chupdown.CyhUploadException;
 import com.ppx.pojo.Feedback;
 import com.sun.org.apache.xalan.internal.xsltc.dom.AbsoluteIterator;
 import org.springframework.stereotype.Controller;
@@ -56,23 +57,23 @@ public class IndexController {
 //    @RequestParam(value = "merge",required = false) Boolean merge,              //合并信号
 //    @RequestParam(value = "cancel",required = false) Boolean cancel             //取消文件上传，删除已上传分块
 
+
     @RequestMapping("/upload")
     @ResponseBody
     public Feedback up(
-            @RequestParam(value = "fileToUpload", required = false) MultipartFile file,
-            CyhParaters cp
-    ) throws IOException, NoSuchAlgorithmException, Exception {
-
-        String filePath = "H:\\upload\\";                          // 文件上传后的路径
+            @RequestParam(value = "fileToUpload", required = false)
+                    MultipartFile file, CyhParaters cp
+    ) throws IOException, NoSuchAlgorithmException,CyhUploadException{
+        String filePath = "H:\\upload\\";    // 文件上传后的路径
         CyhUpload upload = new CyhUpload();
-        Feedback feedback =  upload.upload(filePath,file,cp);  //先调用上传函数，然后才能获取文件信息---包含断点续传
-       // Feedback feedback =  upload.upload(filePath,file);      //普通上传
+        Feedback feedback =  upload.upload(filePath,file,cp);
         CyhFile fileInfo =  upload.getFileInfo();
-        if(fileInfo != null){                               //可能为验证情况，只有在文件上传完成之后才能获取文件信息
+        if(fileInfo != null){
             System.out.println(fileInfo);
         }
        return  feedback;
     }
+
 
     @RequestMapping(value="/download/{suffix}/{fileName}",method = RequestMethod.GET)
     public String downloadFile(@PathVariable("suffix")String suffix, @PathVariable("fileName") String fileName, HttpServletResponse response) {

@@ -186,7 +186,7 @@ var cyhup = function (setUp) {
 
     var param = {
         auto: true,                                       //选中直接上传
-        swf: BASE_URL + '/swf/Uploader.swf',
+        //swf: BASE_URL + '/swf/Uploader.swf',
         server: BASE_URL + UPLOADFUNC,                    // 文件接收服务端
         fileVal: 'fileToUpload',                          //上传的文件name
         pick: '#filePicker',
@@ -197,8 +197,8 @@ var cyhup = function (setUp) {
         threads: 2,
         duplicate: false,                               //不能有相同文件存在
         fileNumLimit: 300,
-        fileSizeLimit: setUp.fileSizeLimit,               // 2000 M
-        fileSingleSizeLimit: setUp.fileSingleSizeLimit,      // 2000 M
+        fileSizeLimit: !!(setUp.fileSizeLimit) ? setUp.fileSizeLimit:200*1024*1024,               // 2000 M
+        fileSingleSizeLimit: !!(setUp.fileSingleSizeLimit) ? setUp.fileSizeLimit:50*1024*1024,      // 2000 M
         resize: false                            // 不压缩image, 默认如果是jpeg，文件上传前会压缩一把再上传！
     };
 
