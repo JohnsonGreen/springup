@@ -24,15 +24,11 @@ import static java.lang.System.out;
  */
 public class CyhUpload {
 
-    private static final String POST_METHOD = "POST";   //限定只能POST上传
-    public static final String MULTIPART = "multipart/";
-
     protected CyhFile fileInfo;      //文件相关信息
     protected CyhParaters cp;    //提交参数
 
     public CyhUpload(){
     }
-
 
     /**
      *   上传函数--断点续传包含验证过程
@@ -116,16 +112,6 @@ public class CyhUpload {
         return feedback;
     }
 
-    /**
-     * 普通上传，不带断点续传的
-     * @param filePath
-     * @param file
-     * @return
-     */
-    public Feedback upload(String filePath, MultipartFile file){
-
-        return  null;
-    }
 
 
     //取消文件上传删除可能存在的临时文件
@@ -306,6 +292,12 @@ public class CyhUpload {
         return feedback;
     }
 
+    /**
+     * 下载函数
+     * @param fileName
+     * @param response
+     * @return
+     */
     public static String download(String fileName, HttpServletResponse response){
         if (fileName != null) {
             File file = new File(fileName);

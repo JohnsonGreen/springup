@@ -10,6 +10,14 @@ public class Feedback {
    private Map<String,Boolean> exist;
    private Integer [] chunks;
 
+    public Feedback() {
+    }
+
+    public Feedback(Map<String, Boolean> exist, Integer[] chunks) {
+        this.exist = exist;
+        this.chunks = chunks;
+    }
+
     public Map<String, Boolean> getExist() {
         return exist;
     }

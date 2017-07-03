@@ -15,6 +15,18 @@ public class CyhParaters {
     private  Boolean merge;           //合并信号
     private  Boolean cancel;          //取消文件上传，删除已上传分块
 
+    public CyhParaters() {
+    }
+
+    public CyhParaters(Integer fileSize, String fileMd5, Integer chunk, Long chunkSize, String suffix, Boolean merge, Boolean cancel) {
+        this.fileSize = fileSize;
+        this.fileMd5 = fileMd5;
+        this.chunk = chunk;
+        this.chunkSize = chunkSize;
+        this.suffix = suffix;
+        this.merge = merge;
+        this.cancel = cancel;
+    }
 
     public Integer getFileSize() {
         return fileSize;
