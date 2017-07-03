@@ -7,10 +7,6 @@ import org.junit.runners.Parameterized;
 
 import java.lang.annotation.Annotation;
 
-
-/**
- * Created by cyh on 2017/7/2.
- */
 public class IDECompatibleParameterized extends Parameterized {
 
     public IDECompatibleParameterized(Class<?> klass) throws Throwable {

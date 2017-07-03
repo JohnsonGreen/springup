@@ -113,8 +113,11 @@ public class CyhUpload {
     }
 
 
-
-    //取消文件上传删除可能存在的临时文件
+    /**
+     * 取消文件上传删除可能存在的临时文件
+     * @param mergeDir
+     * @return
+     */
     private Feedback cancelUpload(String mergeDir){
         Feedback feedback = new Feedback();
         File tpFile = new File(mergeDir + ".tmp");
@@ -317,6 +320,7 @@ public class CyhUpload {
                         os.write(buffer, 0, i);
                         i = bis.read(buffer);
                     }
+                    return "success";
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
